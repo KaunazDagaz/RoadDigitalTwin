@@ -1,0 +1,2 @@
+# Trained YOLO weights (.pt/.onnx) live here. Weights are git-ignored (see .gitignore);
+# this file just keeps the directory in version control.

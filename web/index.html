@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Road Digital Twin — Dashboard</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    html, body { margin: 0; height: 100%; font-family: system-ui, sans-serif; }
+    #map { height: 100%; }
+    #placeholder {
+      position: absolute; z-index: 1000; top: 1rem; left: 1rem;
+      background: rgba(255,255,255,.9); padding: .75rem 1rem; border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="placeholder">
+    <strong>Road Digital Twin</strong><br />
+    Dashboard shell
+  </div>
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map("map").setView([54.6867, 25.2800], 13);
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "© OpenStreetMap contributors",
+    }).addTo(map);
+  </script>
+</body>
+</html>
