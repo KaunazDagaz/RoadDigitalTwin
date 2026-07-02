@@ -25,8 +25,6 @@ _TIMESTAMP_RE = re.compile(
 
 @dataclass
 class TelemetryPoint:
-    """One SRT block: a drone position at a point in the video timeline."""
-
     index: int
     start_ms: int
     lat: float | None
@@ -106,15 +104,13 @@ def _parse_block(block: str) -> TelemetryPoint | None:
     )
 
 def parse_srt_text(text: str) -> list[TelemetryPoint]:
-    """Parse SRT *content* into telemetry points, sorted by video time."""
-    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")  # strip BOM + normalize newlines
+    text = text.lstrip("\ufeff").replace("\r\n", "\n").replace("\r", "\n")
     blocks = re.split(r"\n\s*\n", text)
     points = [p for blk in blocks if (p := _parse_block(blk)) is not None]
     points.sort(key=lambda p: p.start_ms)
     return points
 
 def parse_srt(path: str | Path, encoding: str = "utf-8") -> list[TelemetryPoint]:
-    """Parse an SRT file into telemetry points. Tolerates UTF-8 BOM / latin-1."""
     raw = Path(path).read_bytes()
     try:
         text = raw.decode(encoding)

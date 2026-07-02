@@ -17,5 +17,13 @@ services:
       timeout: 5s
       retries: 5
 
+  blur:
+    build: ./blur
+    container_name: roaddt-blur
+    restart: unless-stopped
+    command: ["--watch", "/data/incoming"]
+    volumes:
+      - ./data:/data
+
 volumes:
   pgdata:

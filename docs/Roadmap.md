@@ -23,7 +23,12 @@ Decisions locked in with the user:
 ## Architecture (decoupled, DB-centric)
 
 ```
-[Drone] --video.mp4 + telemetry(SRT)-->  ┌──────────────────────────────┐
+[Drone] --raw video.mp4 + SRT ------->   ┌──────────────────────────────┐
+                                         │ (0) PRIVACY BLUR — own service │  blur people + plates FIRST
+                                         │  raw video → YOLO(COCO) → clean│  (watches data/incoming/)
+                                         └──────────────┬───────────────┘
+                                                        │ clean video + copied .SRT (filesystem handoff)
+                                         ┌──────────────▼───────────────┐
                                          │ (1) PYTHON PROCESSING PIPELINE │  run per flight (CLI/batch)
                                          │  ingest → frames+telemetry sync │
                                          │  → YOLO detect → georeference   │
@@ -48,6 +53,10 @@ Decisions locked in with the user:
 
 The Python pipeline and the .NET API never call each other — they integrate **only through PostGIS** (and a
 shared image-crop folder). This keeps the two languages cleanly separated and each independently testable.
+
+The **privacy-blur** service sits upstream of all of this: it is the sole reader of raw footage and hands the
+pipeline a clean, anonymized video via the **filesystem** (never the DB) — a deliberate exception to the
+PostGIS-only rule, since blur runs before the database is involved.
 
 ---
 
@@ -80,6 +89,7 @@ GiST spatial indexes on all `geom`. "Repaired" is inferred when a `defect` lies 
 
 | Concern | Choice | License / note |
 |---|---|---|
+| Privacy blur | **Ultralytics YOLO (COCO + plate) + OpenCV + ffmpeg** — blur people + license plates, H.264 out | OSS — own container, runs first |
 | Frame extraction | **ffmpeg** | free |
 | Telemetry parse | custom Python SRT parser (regex) | — |
 | Detection model | **Ultralytics YOLOv8/v11** (n/s) | **AGPL-3.0** — free & OSS; fine for a thesis. (Permissive alt: MMDetection/Detectron2, Apache-2.0, harder.) |
@@ -134,6 +144,18 @@ history; no match → create new `defect` (status NEW). Coverage-without-detecti
 - Provision PostGIS (local Docker + Neon free tier); `CREATE EXTENSION postgis`.
 - Validate ffmpeg frame extraction + first SRT parser → per-frame `(t, lat, lon, alt)` table.
 
+### Phase 0.5 — Privacy blur (anonymization pre-processing) — done
+- **Runs before everything.** Blur people and vehicle license plates in the raw video so nothing
+  downstream ever sees un-anonymized footage (privacy/GDPR — matters especially once cloud-hosted).
+- Own **separate container** (`blur/`), started with the stack — watches `data/incoming/` and writes
+  `data/anonymized/`; integrates via the **filesystem**, not PostGIS.
+- **Ultralytics YOLO** blurs whole people (COCO `person`) and redacts **license plates** (a fine-tuned
+  YOLOv11 plate model); `--vehicles whole` falls back to whole-vehicle blur for high-altitude footage.
+  Re-encode to **H.264 with ffmpeg** preserving fps; copy the `.SRT` sidecar unchanged so
+  frame↔telemetry sync survives. Point `ingest.py` at the anonymized copy in `data/anonymized/`.
+- **Verify-then-delete:** wipe the original off the SD card only after the blurred output is validated
+  (`--delete-source`). The desktop "insert SD → blur → wipe" UX is a thin future driver over this CLI.
+
 ### Phase 1 — Detection model (Weeks 3–6, overlaps P2)
 - Hybrid data: pull a public **aerial** pothole/road-damage set (Roboflow Universe) → train YOLOv8n/s on
   Colab/Kaggle → baseline mAP. (Note: most public sets like **RDD2022 are street-level dashcam**, not
@@ -174,6 +196,7 @@ history; no match → create new `defect` (status NEW). Coverage-without-detecti
 ## Repo structure (files to create)
 
 ```
+/blur (Python)       blur.py (YOLO people/vehicle blur), requirements.txt, Dockerfile, models/<weights>
 /pipeline (Python)   requirements.txt, ingest.py (orchestrator), telemetry.py (SRT+sync),
                      detect.py (YOLO), georef.py (pixel→GPS/GSD), dedup.py (DBSCAN),
                      twin.py (match+trend+status), db.py (SQLAlchemy/psycopg), models/<weights>
@@ -181,7 +204,7 @@ history; no match → create new `defect` (status NEW). Coverage-without-detecti
                      Models/{Flight,Defect,Observation}.cs, Controllers/{Defects,Flights,Heatmap,Reports}
 /web                 index.html, map.js (Leaflet + Leaflet.heat), charts.js (Chart.js)
 /db                  schema.sql / migrations (PostGIS)
-docker-compose.yml   postgis + api + web         README.md
+docker-compose.yml   postgis + blur + api + web   README.md
 ```
 
 ---

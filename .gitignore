@@ -15,6 +15,8 @@ obj/
 
 pipeline/models/*.pt
 pipeline/models/*.onnx
+blur/models/*.pt
+blur/models/*.onnx
 *.weights
 
 /data/*

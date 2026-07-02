@@ -36,7 +36,7 @@ def test_parses_legacy_gps_paren_style():
     assert len(points) == 2
     assert points[0].lat == pytest.approx(50.450100)
     assert points[0].lon == pytest.approx(30.523400)
-    assert points[0].rel_alt == pytest.approx(12.30)  # from BAROMETER
+    assert points[0].rel_alt == pytest.approx(12.30)
     assert gps_coverage(points) == 1.0
 
 def test_timecode_to_ms_and_ordering():
